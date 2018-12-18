@@ -71,7 +71,7 @@ class UserDAO(GenericDAO):
 
     def get_user_id(self, user: User):
         result = self.cursor.callproc('get_user_id', (user.username, user.password, '_id'))
-        return result[2]
+        return 0 if result[2] is None else result[2]
 
 
 class MessageDAO(GenericDAO):

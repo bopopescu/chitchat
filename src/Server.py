@@ -39,79 +39,167 @@ class Server:
         thread_name = current_thread().getName()
         print('\t{}: Started'.format(thread_name))
 
+        # try:
+        #     print('\t{}: Waiting for request'.format(thread_name))
+        #
+        #     data = bytes()
+        #     while True:
+        #         received = client_connection.recv(4096)
+        #         if received is None:
+        #             break
+        #         elif len(received) < 4096:
+        #             data += received
+        #             break
+        #         else:
+        #             data += received
+        #
+        #     request = json.loads(data.decode())
+        #     print('\t{}: Received request {}'.format(thread_name, request))
+        #
+        #     user_data = request['user']
+        #     user = User(user_data['username'], user_data['password'])
+        #
+        #     if request['request'] == 'login' or request['request'] == 'register':
+        #         if request['request'] == 'login':
+        #             print('\t{}: Checking if user is registered'.format(thread_name))
+        #             user.id = self.userDAO.get_user_id(user)
+        #
+        #             if user.id == 0:
+        #                 print('\t{}: User is not registered'.format(thread_name))
+        #                 client_connection.sendall(json.dumps({'message': 'Invalid username or password'}).encode())
+        #                 return
+        #             else:
+        #                 print('\t{}: User logged in'.format(thread_name))
+        #                 client_connection.sendall(json.dumps({'message': 'Logged'}).encode())
+        #
+        #                 print('\t{}: Waiting for client to get ready'.format(thread_name))
+        #                 client_connection.recv(4096)
+        #         else:
+        #             print('\t{}: Trying to add user to the database'.format(thread_name))
+        #             user = self.userDAO.insert(user)
+        #
+        #             if user is None:
+        #                 print('\t{}: User already exists'.format(thread_name))
+        #                 client_connection.sendall(json.dumps({'message': 'User already exists'}).encode())
+        #                 return
+        #             else:
+        #                 print('\t{}: User registered'.format(thread_name))
+        #                 client_connection.sendall(json.dumps({'message': 'Successfully registered'}).encode())
+        #
+        #                 print('\t{}: Waiting for client to get ready'.format(thread_name))
+        #                 client_connection.recv(4096)
+        #
+        #     while True:
+        #         print('\t{}: Pre-fetching client\'s messages '.format(thread_name))
+        #
+        #         data = bytes()
+        #         while True:
+        #             received = client_connection.recv(4096)
+        #             if not received:
+        #                 break
+        #             else:
+        #                 data += received
+        #
+        #         print('\t{}: Message received'.format(thread_name))
+        #
+        #         json_message = json.loads(data.decode())
+        #         message = Message.from_json(json_message)
+        #         self.messageDAO.insert(message)
+        #         print('\t{}: Added message to database'.format(thread_name))
+        #
+        #         if json_message['receiver_id'] in self.connected_clients.keys():
+        #             receiver_connection = self.connected_clients[json_message['receiver_id']]
+        #             receiver_connection.sendall(json_message)
+        #             print('\t{}: Sent message to its receiver'.format(thread_name))
+        #
+        # except ConnectionError or Exception as err:
+        #     client_connection.close()
+        #
+        #     for _id, connection in self.connected_clients.items():
+        #         if connection == client_connection:
+        #             with self.lock:
+        #                 self.connected_clients.pop(_id)
+        #                 break
+        #     raise err
+        #
+        # finally:
+        #     print('\t{}: Connection closed'.format(thread_name))
+        #     client_connection.close()
+
         try:
-            print('\t{}: Waiting for request'.format(thread_name))
-
-            data = bytes()
             while True:
-                received = client_connection.recv(4096)
-                if received is None:
-                    break
-                elif len(received) < 4096:
-                    data += received
-                    break
-                else:
-                    data += received
+                data = bytes()
+                received = bytes()
 
-            request = json.loads(data.decode())
-            print('\t{}: Received request {}'.format(thread_name, request))
-
-            user_data = request['user']
-            user = User(user_data['username'], user_data['password'])
-
-            if request['request'] == 'login' or request['request'] == 'register':
-                if request['request'] == 'login':
-                    print('\t{}: Checking if user is registered'.format(thread_name))
-                    # TODO solve * 'str' object has no attribute 'username' * problem
-                    # user.id = self.userDAO.get_user_id(user.username)
-
-                    if user.id == 0:
-                        print('\t{}: User is not registered'.format(thread_name))
-                        client_connection.sendall(json.dumps({'message': 'Invalid username or password'}).encode())
-                        raise Exception('Disconnecting client')
+                while True:
+                    received += client_connection.recv(4096)
+                    if not received:
+                        break
                     else:
-                        print('\t{}: User logged in'.format(thread_name))
-                        client_connection.sendall(json.dumps({'message': 'Logged'}))
-                else:
-                    print('\t{}: Trying to add user to the database'.format(thread_name))
-                    user = self.userDAO.insert(user)
+                        data += received
 
-                    if user is None:
-                        print('\t{}: User already exists'.format(thread_name))
-                        client_connection.sendall(json.dumps({'message': 'User already exists'}).encode())
-                        raise Exception('Disconnecting client')
+                request = json.loads(data.decode())
+
+                if request['request'] == 'login' or request['request'] == 'register':
+                    user_data = request['user']
+                    user = User(user_data['username'], user_data['password'])
+
+                    if request['request'] == 'login':
+                        print('\t{}: Checking if user is registered'.format(thread_name))
+                        user.id = self.userDAO.get_user_id(user)
+
+                        if user.id == 0:
+                            print('\t{}: User is not registered'.format(thread_name))
+                            response = {'message': 'Invalid username or password'}
+                        else:
+                            print('\t{}: User logged in'.format(thread_name))
+                            self.connected_clients[client_connection.fileno()] = user.id
+                            response = {'message': 'Logged'}
                     else:
-                        print('\t{}: User registered'.format(thread_name))
-                        client_connection.sendall(json.dumps({'message': 'Successfully registered'}).encode())
+                        print('\t{}: Trying to add user to the database'.format(thread_name))
+                        user = self.userDAO.insert(user)
 
-            while True:
-                print('\t{}: Waiting for user to send a message'.format(thread_name))
+                        if user is None:
+                            print('\t{}: User already exists'.format(thread_name))
+                            response = {'message': 'User already exists'}
+                        else:
+                            print('\t{}: User registered'.format(thread_name))
+                            response = {'message': 'Successfully registered'}
 
-                data = client_connection.recv(4096)
-                while data:
-                    data += client_connection.recv(4096)
+                    client_connection.sendall(json.dumps(response).encode())
 
-                print('\t{}: Message received'.format(thread_name))
+                    if response['message'] == 'Invalid username or password' or \
+                       response['message'] == 'User already exists':
+                        break
+                elif request['request'] == 'prefetch_messages':
+                    print('\t{}: Pre-fetching client\'s messages'.format(thread_name))
+                    user_id = self.connected_clients[client_connection.fileno()]
+                    messages = self.messageDAO.prefetch(user_id, 20)
 
-                json_message = json.loads(data.decode())
-                message = Message.from_json(json_message)
-                self.messageDAO.insert(message)
-                print('\t{}: Added message to database'.format(thread_name))
-
-                if json_message['receiver_id'] in self.connected_clients.keys():
-                    receiver_connection = self.connected_clients[json_message['receiver_id']]
-                    receiver_connection.sendall(json_message)
-                    print('\t{}: Sent message to its receiver'.format(thread_name))
+                    for message in messages:
+                        json_message = {
+                            'message': {
+                                'sender': self.userDAO.get_user_by_id(message.sender_id),
+                                'content': message.content
+                            }
+                        }
+                        client_connection.sendall(json.dumps(json_message).encode())
+                elif request['request'] == 'send_message':
+                    pass
 
         except ConnectionError or Exception as err:
             client_connection.close()
 
             for _id, connection in self.connected_clients.items():
                 if connection == client_connection:
-                    self.connected_clients.pop(_id)
-                    break
-
+                    with self.lock:
+                        self.connected_clients.pop(_id)
+                        break
             raise err
+
+        finally:
+            print('\t{}: Connection closed'.format(thread_name))
+            client_connection.close()
 
 
 if __name__ == '__main__':
