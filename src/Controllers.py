@@ -29,9 +29,7 @@ class GenericController:
 class LoginViewController(GenericController):
     def __init__(self, app: Tk, sock: socket = None, model: User = None, view: LoginView = None):
         super().__init__(app, sock, model, view)
-        # self.app = app
-        # self.model = model if model is not None else User()
-        # self.view = view
+        self.model = model if model is not None else User()
         self.socket = socket(AF_INET, SOCK_STREAM)
         self.sha256 = sha256()
         self.user_logged_state = BooleanVar(app)
@@ -102,10 +100,10 @@ class LoginViewController(GenericController):
         self.send_request(request)
         response = self.receive_response()
 
-        if response['message'] == 'Logged':
+        if response['info'] == 'Logged':
             self.user_logged_state.set(True)
         else:
-            messagebox.showwarning(response['message'], title='')
+            messagebox.showwarning(response['info'], title='')
 
     def start_chat_view(self):
         chat_view = MainView(self.app, self.model)
@@ -114,8 +112,8 @@ class LoginViewController(GenericController):
 
     def user_state_changed(self, *args):
         if self.user_logged_state.get() is True:
-            # Open a pop-up that tells to the user he is logged
-            messagebox.showinfo('UHUU', 'Você está logado')
+            for widget in self.app.slaves():
+                widget.destroy()
 
 
 class MainViewController(GenericController):
@@ -157,14 +155,16 @@ class MainViewController(GenericController):
 
                 if 'message' in response:
                     self.received_messages.put(response['message'])
+                elif 'info' in response:
+                    messagebox.showinfo('Server response', response['info'])
 
     def receive_messages(self):
         while True:
             while self.received_messages.empty() is False:
                 # json_message = {
                 #     'message': {
-                #         'sender': self.userDAO.get_user_by_id(message.sender_id),
-                #         'content': message.content
+                #         'sender': 'username'
+                #         'content': 'message content'
                 #     }
                 # }
                 json_message = self.received_messages.get()
@@ -175,8 +175,28 @@ class MainViewController(GenericController):
                 message = '{}: {}'.format(json_message['sender'], json_message['content'])
                 self.view.active_chat.insert(END, message)
 
-    def send_message(self, message: Message):
+    def search_username_changed(self, *args):
+        username = self.view.search_username.get()
+
+        if len(username) >= 8:
+            self.view.search_button['state'] = 'normal'
+        else:
+            self.view.search_button['state'] = 'disabled'
+
+    def search_user(self, *args):
+        username = self.view.search_username.get()
+
+        request = {
+            'request': 'prefetch_messages',
+            'with': username
+        }
+
+    def message_changed(self, *args):
         pass
+
+    def send_message(self, *args):
+        pass
+
 
 # if __name__ == '__main__':
 #     p = 'testPass123'

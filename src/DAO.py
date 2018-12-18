@@ -73,12 +73,18 @@ class UserDAO(GenericDAO):
         result = self.cursor.callproc('get_user_id', (user.username, user.password, '_id'))
         return 0 if result[2] is None else result[2]
 
+    def get_id_by_username(self, username: str):
+        self.cursor.execute('SELECT id FROM user WHERE username = {}'.format(username))
+        result = self.cursor.fetchone()
+
+        return 0 if result is None else result[0]
+
 
 class MessageDAO(GenericDAO):
     def __init__(self, connection: MySQLConnection):
         super().__init__(connection)
 
-    def fetchone(self):
+    def fetchone(self, username: str):
         pass
 
     def fetchall(self):
@@ -99,11 +105,12 @@ class MessageDAO(GenericDAO):
     def update(self, *args):
         pass
 
-    def prefetch(self, user_id: int, num_of_messages: int):
+    def prefetch(self, user_id: int, other_id: int, num_of_messages: int):
         query = 'SELECT * FROM message \n\
-                 WHERE sender_id = {_id} OR receiver_id = {_id} \n\
+                 WHERE (sender_id = {user_id} AND receiver_id = {other_id}) \
+                 OR (sender_id = {other_id} AND receiver_id = {user_id}) \n\
                  ORDER BY send_time DESC \n\
-                 LIMIT {quantity}'.format(_id=user_id, quantity=num_of_messages)
+                 LIMIT {quantity}'.format(user_id=user_id, other_id=other_id, quantity=num_of_messages)
         self.execute(query)
 
         return [
