@@ -1,7 +1,7 @@
 from src import server_host
 from src.Models import User, Message
 from src.DAO import UserDAO, MessageDAO
-from threading import Thread, Lock, current_thread
+from threading import Thread, Lock, current_thread, local
 from queue import Queue
 import json
 import socket
@@ -41,12 +41,16 @@ class Server:
 
         try:
             while True:
+                local_data = local()
                 data = bytes()
                 received = bytes()
 
                 while True:
                     received += client_connection.recv(4096)
                     if not received:
+                        break
+                    elif len(received) < 4096:
+                        data += received
                         break
                     else:
                         data += received
@@ -66,7 +70,8 @@ class Server:
                             response = {'info': 'Invalid username or password'}
                         else:
                             print('\t{}: User logged in'.format(thread_name))
-                            self.connected_clients[client_connection.fileno()] = user.id
+                            local_data.user = user
+                            self.connected_clients[local_data.user.id] = client_connection
                             response = {'info': 'Logged'}
                     else:
                         print('\t{}: Trying to add user to the database'.format(thread_name))
@@ -77,36 +82,56 @@ class Server:
                             response = {'info': 'User already exists'}
                         else:
                             print('\t{}: User registered'.format(thread_name))
+                            local_data.user = user
                             response = {'info': 'Successfully registered'}
 
                     client_connection.sendall(json.dumps(response).encode())
 
-                    if response['info'] == 'Invalid username or password' or \
-                       response['info'] == 'User already exists':
+                    if response['info'] == 'Invalid username or password' \
+                       or response['info'] == 'User already exists':
                         break
                 elif request['request'] == 'prefetch_messages':
                     print('\t{}: Fetching user messages'.format(thread_name))
-                    user_id = self.connected_clients[client_connection.fileno()]
+
                     other_id = self.userDAO.get_id_by_username(request['with'])
 
                     if other_id == 0:
-                        response = {'info': '{} does not exist'.format(request['with'])}
+                        response = {'search_result': {'info': '{} does not exist'.format(request['with'])}}
                         client_connection.sendall(json.dumps(response).encode())
                     else:
-                        messages = self.messageDAO.prefetch(user_id, other_id, 20)
+                        local_data.other_client = self.userDAO.get_user_by_id(other_id)
+                        messages = self.messageDAO.prefetch(local_data.user.id, local_data.other_client.id, 20)
 
                         for message in messages:
+                            if message.sender_id == local_data.user.id:
+                                sender_username = local_data.user.username
+                            else:
+                                sender_username = local_data.other_client.username
+
                             json_message = {
                                 'message': {
-                                    'sender': self.userDAO.get_user_by_id(message.sender_id),
+                                    'sender': sender_username,
                                     'content': message.content
                                 }
                             }
-                            client_connection.sendall(json.dumps(json_message).encode())
+                            response = {'search_result': json_message}
+                            client_connection.sendall(json.dumps(response).encode())
                 elif request['request'] == 'send_message':
-                    pass
+                    json_message = request['message']
+                    message = Message(local_data.user.id,
+                                      local_data.other_client.id,
+                                      content=json_message['content'],
+                                      send_time=json_message['send_time'],
+                                      status=1)
+                    self.messageDAO.insert(message)
+
+                    if local_data.other_client.id in self.connected_clients.keys():
+                        connection = self.connected_clients[local_data.user.id]
+                        message = {'sender': local_data.user.username, 'content': json_message['content']}
+                        connection.sendall(json.dumps({'message': message}).encode())
 
         except ConnectionError or Exception as err:
+            print('\t{}: Some error happened, connection will be closed'.format(thread_name))
             client_connection.close()
 
             for _id, connection in self.connected_clients.items():
@@ -124,3 +149,4 @@ class Server:
 if __name__ == '__main__':
     server = Server()
     server.run()
+

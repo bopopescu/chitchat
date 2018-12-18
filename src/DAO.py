@@ -74,7 +74,7 @@ class UserDAO(GenericDAO):
         return 0 if result[2] is None else result[2]
 
     def get_id_by_username(self, username: str):
-        self.cursor.execute('SELECT id FROM user WHERE username = {}'.format(username))
+        self.cursor.execute('SELECT id FROM `user` WHERE username = \'{}\''.format(username))
         result = self.cursor.fetchone()
 
         return 0 if result is None else result[0]

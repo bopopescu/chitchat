@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from src.Views import LoginView, MainView, Message
 from src.Models import User
 from threading import Thread
@@ -105,28 +107,30 @@ class LoginViewController(GenericController):
         else:
             messagebox.showwarning(response['info'], title='')
 
-    def start_chat_view(self):
-        chat_view = MainView(self.app, self.model)
-        chat_controller = MainViewController(chat_view, self.model)
-        chat_view.controller = chat_controller
+    def start_main_view(self):
+        controller = MainViewController(self.app, self.socket, self.model)
+        view = MainView(self.app, controller=controller)
+        controller.view = view
 
     def user_state_changed(self, *args):
         if self.user_logged_state.get() is True:
             for widget in self.app.slaves():
                 widget.destroy()
 
+            self.start_main_view()
+
 
 class MainViewController(GenericController):
-    def __init__(self, app: Tk, sock: socket, view: MainView, model: User):
+    def __init__(self, app: Tk, sock: socket, model: User, view: MainView = None):
         super().__init__(app, sock, model, view)
-        # self.model = model
-        # self.view = view
-        # self.socket = sock
+        self.response_receive_handler = Thread(target=self.receive_response)
+        self.response_receive_handler = Thread(target=self.receive_response)
+        self.response_receive_handler.start()
         self.received_responses = Queue()
-        self.response_handler = Thread(target=self.treat_responses, daemon=True)
+        self.response_handler = Thread(target=self.treat_responses)
         self.response_handler.start()
         self.received_messages = Queue()
-        self.received_messages_handler = Thread(target=self.receive_messages, daemon=True)
+        self.received_messages_handler = Thread(target=self.receive_messages)
         self.received_messages_handler.start()
 
     def send_request(self, request: dict):
@@ -140,9 +144,9 @@ class MainViewController(GenericController):
                 received = self.socket.recv(4096)
                 if not received:
                     break
-                # elif len(received) < 4096:
-                #     data += received
-                #     break
+                elif len(received) < 4096:
+                    data += received
+                    break
                 else:
                     data += received
 
@@ -157,6 +161,15 @@ class MainViewController(GenericController):
                     self.received_messages.put(response['message'])
                 elif 'info' in response:
                     messagebox.showinfo('Server response', response['info'])
+                elif 'search_result' in response:
+                    if 'message' in response['search_result']:
+                        # Clears the listbox if there's any message in it
+                        if self.view.active_chat.get(0) is not None:
+                            self.view.active_chat.delete(0, END)
+
+                        self.received_messages.put(response['search_result']['message'])
+                    else:
+                        messagebox.showinfo('Server response', response['search_result']['info'])
 
     def receive_messages(self):
         while True:
@@ -191,11 +204,26 @@ class MainViewController(GenericController):
             'with': username
         }
 
+        self.send_request(request)
+
     def message_changed(self, *args):
-        pass
+        if len(self.view.message.get()) > 0:
+            self.view.send_message_button['state'] = 'normal'
+        else:
+            self.view.send_message_button['state'] = 'disabled'
 
     def send_message(self, *args):
-        pass
+        request = {
+            'request': 'send_message',
+            'message': {
+                'sender': self.model.username,
+                'content': self.view.message_entry.get(),
+                'send_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'status': 1
+            }
+        }
+
+        self.send_request(request)
 
 
 # if __name__ == '__main__':

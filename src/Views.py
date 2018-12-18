@@ -36,6 +36,7 @@ class LoginView(Frame):
         self.password = StringVar()
         self.password.trace('w', self.controller.password_var_changed)
         self.pass_entry = Entry(self, textvariable=self.password, show='*', font=self.font)
+        self.pass_entry.bind('<<Return>>', self.controller.submit)
         self.pass_entry['state'] = 'disabled'
         self.pass_entry.grid(row=2, column=1, padx=self.grid_padding, pady=self.grid_padding)
 
@@ -70,7 +71,8 @@ class MainView(Frame):
         self.search_frame_title.grid(columnspan=2, sticky=NSEW)
         self.username_entry = Entry(master=self.search_frame, textvariable=self.search_username, font=self.font)
         self.username_entry.grid(row=1, column=0, padx=5, sticky=E)
-        self.search_button = Button(master=self.search_frame, text='Procurar', font=self.font)
+        self.search_button = Button(master=self.search_frame, text='Procurar',
+                                    command=self.controller.search_user, font=self.font)
         self.search_button.grid(row=1, column=1, padx=5, sticky=W)
 
         columns, rows = self.search_frame.grid_size()
@@ -92,6 +94,7 @@ class MainView(Frame):
         self.chat_form_frame.pack(padx=5, pady=5, fill=X, expand=1)
         self.message_entry = Entry(master=self.chat_form_frame, textvariable=self.message,
                                    font=self.font, state='disabled')
+        self.message_entry.bind('<<Return>>', self.controller.send_message)
         self.message_entry.pack(side=LEFT, fill=BOTH, expand=TRUE)
         self.send_message_button = Button(master=self.chat_form_frame, text='send',
                                           font=self.font, state='disabled')
