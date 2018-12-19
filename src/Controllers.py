@@ -162,14 +162,15 @@ class MainViewController(GenericController):
                 elif 'info' in response:
                     messagebox.showinfo('Server response', response['info'])
                 elif 'search_result' in response:
-                    if 'message' in response['search_result']:
-                        # Clears the listbox if there's any message in it
-                        if self.view.active_chat.get(0) is not None:
-                            self.view.active_chat.delete(0, END)
+                    result = response['search_result']
 
-                        self.received_messages.put(response['search_result']['message'])
+                    if result['info'].endswith('exist'):
+                        messagebox.showinfo('Server response', result['info'])
                     else:
-                        messagebox.showinfo('Server response', response['search_result']['info'])
+                        self.view.active_chat['state'] = 'normal'
+                        self.view.message_entry['state'] = 'normal'
+                        self.view.send_message_button['state'] = 'normal'
+                        self.view.active_chat.delete(0, END)
 
     def receive_messages(self):
         while True:
@@ -187,6 +188,7 @@ class MainViewController(GenericController):
 
                 message = '{}: {}'.format(json_message['sender'], json_message['content'])
                 self.view.active_chat.insert(END, message)
+                # TODO store the amount of messages in the chat put new messages in the right place
 
     def search_username_changed(self, *args):
         username = self.view.search_username.get()
@@ -200,8 +202,8 @@ class MainViewController(GenericController):
         username = self.view.search_username.get()
 
         request = {
-            'request': 'prefetch_messages',
-            'with': username
+            'request': 'search_for',
+            'username': username
         }
 
         self.send_request(request)
@@ -224,7 +226,6 @@ class MainViewController(GenericController):
         }
 
         self.send_request(request)
-
 
 # if __name__ == '__main__':
 #     p = 'testPass123'

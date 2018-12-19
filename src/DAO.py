@@ -66,8 +66,8 @@ class UserDAO(GenericDAO):
         return self.fetchone()
 
     def get_user_by_id(self, user_id: int):
-        result = self.cursor.callproc('get_user_by_id', (user_id, ('username', 'password')))
-        return {'username': result[2][0], 'password': result[2][1]}
+        result = self.cursor.callproc('get_user_by_id', (user_id, 'username', 'password'))
+        return {'username': result[1], 'password': result[2]}
 
     def get_user_id(self, user: User):
         result = self.cursor.callproc('get_user_id', (user.username, user.password, '_id'))

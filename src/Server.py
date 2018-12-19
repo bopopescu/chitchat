@@ -40,8 +40,8 @@ class Server:
         print('\t{}: Started'.format(thread_name))
 
         try:
+            local_data = local()
             while True:
-                local_data = local()
                 data = bytes()
                 received = bytes()
 
@@ -90,32 +90,37 @@ class Server:
                     if response['info'] == 'Invalid username or password' \
                        or response['info'] == 'User already exists':
                         break
-                elif request['request'] == 'prefetch_messages':
-                    print('\t{}: Fetching user messages'.format(thread_name))
-
+                elif request['request'] == 'search_for':
+                    print('\t{}: Searching for user'.format(thread_name))
                     other_id = self.userDAO.get_id_by_username(request['with'])
 
                     if other_id == 0:
-                        response = {'search_result': {'info': '{} does not exist'.format(request['with'])}}
+                        response = {'search_result': {'info': '{} does not exist'.format(request['username'])}}
                         client_connection.sendall(json.dumps(response).encode())
                     else:
-                        local_data.other_client = self.userDAO.get_user_by_id(other_id)
-                        messages = self.messageDAO.prefetch(local_data.user.id, local_data.other_client.id, 20)
+                        json_user = self.userDAO.get_user_by_id(other_id)
+                        local_data.other_client = User(json_user['username'], json_user['password'], _id=other_id)
+                        response = {'search_result': {'info': '{} found'.format(request['username'])}}
+                        client_connection.sendall(json.dumps({response}).encode())
 
-                        for message in messages:
-                            if message.sender_id == local_data.user.id:
-                                sender_username = local_data.user.username
-                            else:
-                                sender_username = local_data.other_client.username
+                elif request['request'] == 'prefetch_messages':
+                    print('\t{}: Fetching user messages'.format(thread_name))
+                    messages = self.messageDAO.prefetch(local_data.user.id, local_data.other_client.id, 20)
 
-                            json_message = {
-                                'message': {
-                                    'sender': sender_username,
-                                    'content': message.content
-                                }
+                    for message in messages:
+                        if message.sender_id == local_data.user.id:
+                            sender_username = local_data.user.username
+                        else:
+                            sender_username = local_data.other_client.username
+
+                        json_message = {
+                            'message': {
+                                'sender': sender_username,
+                                'content': message.content
                             }
-                            response = {'search_result': json_message}
-                            client_connection.sendall(json.dumps(response).encode())
+                        }
+                        response = {'search_result': json_message}
+                        client_connection.sendall(json.dumps(response).encode())
                 elif request['request'] == 'send_message':
                     json_message = request['message']
                     message = Message(local_data.user.id,
