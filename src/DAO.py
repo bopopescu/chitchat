@@ -1,5 +1,4 @@
-import mysql.connector as mysql
-from mysql.connector import MySQLConnection
+from mysql.connector import MySQLConnection, IntegrityError
 from src.Models import User, Message
 
 
@@ -53,7 +52,10 @@ class UserDAO(GenericDAO):
         ]
 
     def insert(self, user: User):
-        self.cursor.callproc('add_user', (user.username, user.password))
+        try:
+            self.cursor.callproc('add_user', (user.username, user.password))
+        except IntegrityError as err:
+            return None
 
     def remove(self, user: User):
         self.cursor.callproc('rmv_user', user.username)

@@ -1,7 +1,6 @@
+from Controllers import LoginViewController
+from Views import LoginView
 from tkinter import Tk, messagebox
-
-from src.Controllers import LoginViewController
-from src.Views import LoginView
 
 
 class App(Tk):
@@ -22,6 +21,7 @@ class App(Tk):
         if messagebox.askquestion('Quit', 'Do you really want to quit?') == 'yes':
             # Close the app
             self.destroy()
+            exit(0)
 
 
 if __name__ == '__main__':

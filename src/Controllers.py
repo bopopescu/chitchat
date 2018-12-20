@@ -1,25 +1,21 @@
+from Views import LoginView, MainView, Message
+from Models import User
 from datetime import datetime
-
-from src.Views import LoginView, MainView, Message
-from src.Models import User
 from threading import Thread
 from hashlib import sha256
 from queue import Queue
-import src.server_host as server_host
 from socket import socket, AF_INET, SOCK_STREAM
-import json
 from tkinter import Tk, BooleanVar, messagebox, END
+import server_host as server_host
+import json
 
 
 class GenericController:
-    def __init__(self, app: Tk, sock: socket = None, model: User = None, view = None):
+    def __init__(self, app: Tk, sock: socket, model: User = None, view = None):
         self.app = app
+        self.socket = sock
         self.model = model
         self.view = view
-        self.socket = sock
-
-    def connect(self):
-        pass
 
     def send_request(self, request: dict):
         raise NotImplementedError('method send_request must be implemented')
@@ -105,7 +101,7 @@ class LoginViewController(GenericController):
         if response['info'] == 'Logged':
             self.user_logged_state.set(True)
         else:
-            messagebox.showwarning(response['info'], title='')
+            messagebox.showwarning('Server says', response['info'])
 
     def start_main_view(self):
         controller = MainViewController(self.app, self.socket, self.model)
@@ -117,6 +113,7 @@ class LoginViewController(GenericController):
             for widget in self.app.slaves():
                 widget.destroy()
 
+            self.app.geometry('500x400')
             self.start_main_view()
 
 
@@ -132,9 +129,11 @@ class MainViewController(GenericController):
         self.received_messages = Queue()
         self.received_messages_handler = Thread(target=self.receive_messages)
         self.received_messages_handler.start()
+        self.last_request = dict()
 
     def send_request(self, request: dict):
         serialized_request = json.dumps(request)
+        self.last_request = request
         self.socket.sendall(serialized_request.encode())
 
     def receive_response(self):
@@ -150,12 +149,12 @@ class MainViewController(GenericController):
                 else:
                     data += received
 
-            self.received_responses.put(data)
+            self.received_responses.put(json.loads(data.decode()))
 
     def treat_responses(self):
         while True:
             while self.received_responses.empty() is False:
-                response = json.loads(self.received_responses.get())
+                response = self.received_responses.get()
 
                 if 'message' in response:
                     self.received_messages.put(response['message'])
@@ -171,24 +170,21 @@ class MainViewController(GenericController):
                         self.view.message_entry['state'] = 'normal'
                         self.view.send_message_button['state'] = 'normal'
                         self.view.active_chat.delete(0, END)
+                        self.send_request({'request': 'prefetch_messages'})
 
     def receive_messages(self):
         while True:
             while self.received_messages.empty() is False:
-                # json_message = {
-                #     'message': {
-                #         'sender': 'username'
-                #         'content': 'message content'
-                #     }
-                # }
                 json_message = self.received_messages.get()
 
                 if json_message['sender'] == self.model.username:
                     json_message['sender'] = 'Você'
 
                 message = '{}: {}'.format(json_message['sender'], json_message['content'])
-                self.view.active_chat.insert(END, message)
-                # TODO store the amount of messages in the chat put new messages in the right place
+                if self.last_request['request'] != 'send_message':
+                    self.view.active_chat.insert(0, message)
+                else:
+                    self.view.active_chat.insert(END, message)
 
     def search_username_changed(self, *args):
         username = self.view.search_username.get()

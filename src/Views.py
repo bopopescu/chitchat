@@ -1,4 +1,4 @@
-from src.Models import User
+from Models import User
 from tkinter import *
 from tkinter.font import Font
 
@@ -96,8 +96,8 @@ class MainView(Frame):
                                    font=self.font, state='disabled')
         self.message_entry.bind('<<Return>>', self.controller.send_message)
         self.message_entry.pack(side=LEFT, fill=BOTH, expand=TRUE)
-        self.send_message_button = Button(master=self.chat_form_frame, text='send',
-                                          font=self.font, state='disabled')
+        self.send_message_button = Button(master=self.chat_form_frame, text='send', font=self.font, state='disabled',
+                                          command=self.controller.send_message)
         self.send_message_button.pack(padx=5, side=RIGHT, fill=BOTH)
 
 

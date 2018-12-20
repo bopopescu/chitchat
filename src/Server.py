@@ -1,8 +1,9 @@
-from src import server_host
-from src.Models import User, Message
-from src.DAO import UserDAO, MessageDAO
+from Models import User, Message
+from DAO import UserDAO, MessageDAO
 from threading import Thread, Lock, current_thread, local
 from queue import Queue
+import server_host
+import time
 import json
 import socket
 import mysql.connector as mysql
@@ -92,7 +93,7 @@ class Server:
                         break
                 elif request['request'] == 'search_for':
                     print('\t{}: Searching for user'.format(thread_name))
-                    other_id = self.userDAO.get_id_by_username(request['with'])
+                    other_id = self.userDAO.get_id_by_username(request['username'])
 
                     if other_id == 0:
                         response = {'search_result': {'info': '{} does not exist'.format(request['username'])}}
@@ -101,8 +102,7 @@ class Server:
                         json_user = self.userDAO.get_user_by_id(other_id)
                         local_data.other_client = User(json_user['username'], json_user['password'], _id=other_id)
                         response = {'search_result': {'info': '{} found'.format(request['username'])}}
-                        client_connection.sendall(json.dumps({response}).encode())
-
+                        client_connection.sendall(json.dumps(response).encode())
                 elif request['request'] == 'prefetch_messages':
                     print('\t{}: Fetching user messages'.format(thread_name))
                     messages = self.messageDAO.prefetch(local_data.user.id, local_data.other_client.id, 20)
@@ -119,8 +119,8 @@ class Server:
                                 'content': message.content
                             }
                         }
-                        response = {'search_result': json_message}
-                        client_connection.sendall(json.dumps(response).encode())
+                        client_connection.sendall(json.dumps(json_message).encode())
+                        time.sleep(0.08)
                 elif request['request'] == 'send_message':
                     json_message = request['message']
                     message = Message(local_data.user.id,
@@ -129,13 +129,19 @@ class Server:
                                       send_time=json_message['send_time'],
                                       status=1)
                     self.messageDAO.insert(message)
+                    message = {
+                        'message': {
+                            'sender': local_data.user.username,
+                            'content': json_message['content']
+                        }
+                    }
+                    client_connection.sendall(json.dumps(message).encode())
 
                     if local_data.other_client.id in self.connected_clients.keys():
                         connection = self.connected_clients[local_data.user.id]
-                        message = {'sender': local_data.user.username, 'content': json_message['content']}
                         connection.sendall(json.dumps({'message': message}).encode())
 
-        except ConnectionError or Exception as err:
+        except ConnectionError or Exception:
             print('\t{}: Some error happened, connection will be closed'.format(thread_name))
             client_connection.close()
 
@@ -144,7 +150,6 @@ class Server:
                     with self.lock:
                         self.connected_clients.pop(_id)
                         break
-            raise err
 
         finally:
             print('\t{}: Connection closed'.format(thread_name))
