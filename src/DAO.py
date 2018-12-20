@@ -1,3 +1,6 @@
+from _sha256 import sha256
+
+import mysql.connector as mysql
 from mysql.connector import MySQLConnection, IntegrityError
 from src.Models import User, Message
 
@@ -53,7 +56,8 @@ class UserDAO(GenericDAO):
 
     def insert(self, user: User):
         try:
-            self.cursor.callproc('add_user', (user.username, user.password))
+            result = self.cursor.callproc('add_user', (user.username, user.password, '_id'))
+            return User(result[0], result[1], _id=result[2])
         except IntegrityError as err:
             return None
 
@@ -126,15 +130,15 @@ class MessageDAO(GenericDAO):
         ]
 
 
-# if __name__ == '__main__':
-#     database_connection = mysql.connect(
-#         host='localhost',
-#         user='root',
-#         password='',
-#         database='chitchatdb'
-#     )
-#     cursor = database_connection.cursor()
-#     query = ''
-#
-#     cursor.execute(query)
-#     result = cursor.fetchall()
+if __name__ == '__main__':
+    # database_connection = mysql.connect(
+    #     host='localhost',
+    #     user='root',
+    #     password='',
+    #     database='chitchatdb'
+    # )
+    #
+    # dao = UserDAO(database_connection)
+    # x = dao.fetchall()
+    # print(x)
+    print(sha256('dummypass'.encode()).hexdigest())

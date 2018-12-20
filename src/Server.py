@@ -83,6 +83,7 @@ class Server:
                             response = {'info': 'User already exists'}
                         else:
                             print('\t{}: User registered'.format(thread_name))
+                            user.id = self.userDAO.get_id_by_username(user.username)
                             local_data.user = user
                             response = {'info': 'Successfully registered'}
 
@@ -114,7 +115,7 @@ class Server:
                             sender_username = local_data.other_client.username
 
                         json_message = {
-                            'message': {
+                            'fetched_message': {
                                 'sender': sender_username,
                                 'content': message.content
                             }
@@ -138,8 +139,8 @@ class Server:
                     client_connection.sendall(json.dumps(message).encode())
 
                     if local_data.other_client.id in self.connected_clients.keys():
-                        connection = self.connected_clients[local_data.user.id]
-                        connection.sendall(json.dumps({'message': message}).encode())
+                        connection = self.connected_clients[local_data.other_client.id]
+                        connection.sendall(json.dumps(message).encode())
 
         except ConnectionError or Exception:
             print('\t{}: Some error happened, connection will be closed'.format(thread_name))

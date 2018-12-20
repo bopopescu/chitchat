@@ -1,3 +1,5 @@
+import time
+
 from Views import LoginView, MainView, Message
 from Models import User
 from datetime import datetime
@@ -129,11 +131,9 @@ class MainViewController(GenericController):
         self.received_messages = Queue()
         self.received_messages_handler = Thread(target=self.receive_messages)
         self.received_messages_handler.start()
-        self.last_request = dict()
 
     def send_request(self, request: dict):
         serialized_request = json.dumps(request)
-        self.last_request = request
         self.socket.sendall(serialized_request.encode())
 
     def receive_response(self):
@@ -156,8 +156,8 @@ class MainViewController(GenericController):
             while self.received_responses.empty() is False:
                 response = self.received_responses.get()
 
-                if 'message' in response:
-                    self.received_messages.put(response['message'])
+                if 'message' in response or 'fetched_message' in response:
+                    self.received_messages.put(response)
                 elif 'info' in response:
                     messagebox.showinfo('Server response', response['info'])
                 elif 'search_result' in response:
@@ -174,17 +174,20 @@ class MainViewController(GenericController):
 
     def receive_messages(self):
         while True:
-            while self.received_messages.empty() is False:
-                json_message = self.received_messages.get()
+            if self.received_messages.empty() is False:
+                response = self.received_messages.get()
+                is_fetched = 'fetched_message' in response
+                json_message = response['message'] if 'message' in response else response['fetched_message']
 
                 if json_message['sender'] == self.model.username:
                     json_message['sender'] = 'Você'
 
                 message = '{}: {}'.format(json_message['sender'], json_message['content'])
-                if self.last_request['request'] != 'send_message':
+                if is_fetched:
                     self.view.active_chat.insert(0, message)
                 else:
                     self.view.active_chat.insert(END, message)
+            time.sleep(0.05)
 
     def search_username_changed(self, *args):
         username = self.view.search_username.get()
