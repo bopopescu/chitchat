@@ -112,7 +112,7 @@ class LoginViewController(GenericController):
 
     def user_state_changed(self, *args):
         if self.user_logged_state.get() is True:
-            for widget in self.app.slaves():
+            for widget in self.app.subordinates():
                 widget.destroy()
 
             self.app.geometry('500x400')
